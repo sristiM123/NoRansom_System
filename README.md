@@ -1,4 +1,4 @@
-# NoRansom
+# RansomGuard_System
 
 A lightweight, behavior-based ransomware detection system for IoT and edge environments.
 It detects ransomware by correlating short bursts of abnormal filesystem activity —
@@ -8,7 +8,7 @@ or machine learning.
 ## What problem it solves
 
 IoT devices and small organizations are frequent ransomware targets but often cannot
-run heavy endpoint security tools. NoRansom provides early detection and containment
+run heavy endpoint security tools. RansomGuard_System provides early detection and containment
 using simple, explainable, and efficient logic suitable for constrained systems.
 
 ## How it works
