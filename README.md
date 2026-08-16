@@ -1,8 +1,8 @@
 # RansomGuard_System
 
 A lightweight, behavior-based ransomware detection system for IoT and edge environments.
-It detects ransomware by correlating short bursts of abnormal filesystem activity —
-high-entropy writes, rename storms, mass deletion — rather than relying on signatures
+It detects ransomware by correlating short bursts of abnormal filesystem activity,
+high-entropy writes, rename storms, mass deletion, rather than relying on signatures
 or machine learning.
 
 ## What problem it solves
