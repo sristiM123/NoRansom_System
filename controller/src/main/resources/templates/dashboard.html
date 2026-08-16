@@ -1,0 +1,194 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>RansomGuard — Lightweight IoT Ransomware Detection</title>
+    <style>
+        body { font-family: Arial, sans-serif; background:#f6f8fb; margin:0; }
+        header { background:#1e3b5c; color:#fff; padding:18px 22px; font-weight:700; font-size:22px; display:flex; justify-content:space-between; }
+        .pill { background:#dff7df; color:#0a6b0a; padding:6px 12px; border-radius:20px; font-size:14px; }
+        .wrap { max-width:1100px; margin:24px auto; padding:0 16px; }
+        .card { background:#fff; border-radius:10px; padding:18px; box-shadow:0 2px 10px rgba(0,0,0,.06); margin-bottom:18px; }
+        table { width:100%; border-collapse:collapse; }
+        th, td { padding:10px; border-bottom:1px solid #eee; text-align:left; font-size:14px; }
+        th { background:#f0f4f8; }
+        button { padding:8px 12px; border:0; border-radius:6px; cursor:pointer; }
+        .btn { background:#1e3b5c; color:#fff; }
+        .btn-danger { background:#d62d2d; color:#fff; }
+        .muted { color:#666; }
+        .row { display:flex; gap:14px; }
+        .col { flex:1; }
+        .tag { padding:4px 10px; border-radius:999px; font-size:12px; display:inline-block; }
+        .tag-yes { background:#ffe2e2; color:#a80000; }
+        .tag-no { background:#e1f7e1; color:#0a6b0a; }
+    </style>
+</head>
+<body>
+<header>
+    <div>RansomGuard — Lightweight IoT Ransomware Detection</div>
+    <div class="pill" id="conn">CONNECTED</div>
+</header>
+
+<div class="wrap">
+    <div class="card">
+        <h3 style="margin-top:0">Current Risk</h3>
+        <div id="riskLine" class="muted">Loading...</div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top:0">Actions</h3>
+        <button class="btn" onclick="refresh()">Refresh</button>
+        <button class="btn" onclick="quarantine()">Quarantine Device</button>
+        <button class="btn-danger" onclick="releaseDevice()">Release Device</button>
+        <span class="muted" id="selNote" style="margin-left:10px">Select a device below first.</span>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top:0">Connected Devices</h3>
+        <table>
+            <thead>
+            <tr>
+                <th>Select</th><th>Device</th><th>Status</th><th>Quarantine</th><th>Last Seen</th>
+            </tr>
+            </thead>
+            <tbody id="devicesBody">
+            <tr><td colspan="5" class="muted">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="row">
+        <div class="card col">
+            <h3 style="margin-top:0">Alerts</h3>
+            <table>
+                <thead><tr><th>Time</th><th>Device</th><th>Type</th><th>Severity</th><th>Message</th></tr></thead>
+                <tbody id="alertsBody"><tr><td colspan="5" class="muted">Loading...</td></tr></tbody>
+            </table>
+        </div>
+
+        <div class="card col">
+            <h3 style="margin-top:0">Recent Events</h3>
+            <table>
+                <thead><tr><th>Time</th><th>Device</th><th>Event</th><th>Severity</th><th>Details</th></tr></thead>
+                <tbody id="eventsBody"><tr><td colspan="5" class="muted">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let selectedDevice = null;
+
+    function fmtTime(ms){
+      if(!ms || ms<=0) return "—";
+      return new Date(ms).toLocaleString();
+    }
+
+    async function fetchReport(){
+      const res = await fetch("/api/report");
+      if(!res.ok) throw new Error("report failed");
+      return res.json();
+    }
+
+    function render(report){
+      const risk = report.risk || {};
+      document.getElementById("riskLine").innerText =
+        `Max Severity (2 min): ${risk.maxSeverity2m ?? 0} | Ransomware Signals: ${risk.ransomSignals ?? 0}`;
+
+      const devices = report.devices || [];
+      const db = document.getElementById("devicesBody");
+      db.innerHTML = "";
+      if(devices.length === 0){
+        db.innerHTML = `<tr><td colspan="5" class="muted">No devices yet. (Agent not sending or store empty.)</td></tr>`;
+      } else {
+        for(const d of devices){
+          const q = d.quarantined ? `<span class="tag tag-yes">YES</span>` : `<span class="tag tag-no">NO</span>`;
+          const checked = (selectedDevice === d.deviceId) ? "checked" : "";
+          db.innerHTML += `
+            <tr>
+              <td><input type="radio" name="devsel" ${checked} onchange="selectDev('${d.deviceId}')"></td>
+              <td>${d.deviceId}</td>
+              <td>${d.status || "—"}</td>
+              <td>${q}</td>
+              <td>${fmtTime(d.lastSeenMs)}</td>
+            </tr>`;
+        }
+      }
+
+      const alerts = report.latestAlerts || [];
+      const ab = document.getElementById("alertsBody");
+      ab.innerHTML = "";
+      if(alerts.length === 0){
+        ab.innerHTML = `<tr><td colspan="5" class="muted">No alerts yet.</td></tr>`;
+      } else {
+        for(const a of alerts.slice(-20)){
+          ab.innerHTML += `
+            <tr>
+              <td>${fmtTime(a.timestampMs)}</td>
+              <td>${a.deviceId}</td>
+              <td>${a.type}</td>
+              <td>${a.severity}</td>
+              <td>${a.message}</td>
+            </tr>`;
+        }
+      }
+
+      const events = report.latestEvents || [];
+      const eb = document.getElementById("eventsBody");
+      eb.innerHTML = "";
+      if(events.length === 0){
+        eb.innerHTML = `<tr><td colspan="5" class="muted">No events yet.</td></tr>`;
+      } else {
+        for(const e of events.slice(-20)){
+          eb.innerHTML += `
+            <tr>
+              <td>${fmtTime(e.timestampMs)}</td>
+              <td>${e.deviceId}</td>
+              <td>${e.eventType}</td>
+              <td>${e.severity}</td>
+              <td>${e.details}</td>
+            </tr>`;
+        }
+      }
+    }
+
+    function selectDev(id){
+      selectedDevice = id;
+      document.getElementById("selNote").innerText = `Selected: ${id}`;
+    }
+
+    async function refresh(){
+      try{
+        const r = await fetchReport();
+        render(r);
+      }catch(e){
+        document.getElementById("conn").innerText = "DISCONNECTED";
+        document.getElementById("conn").className = "pill";
+      }
+    }
+
+    async function quarantine(){
+      if(!selectedDevice) return alert("Select a device first");
+      await fetch(`/api/quarantine/${selectedDevice}`, {
+        method:"POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({reason:"manual"})
+      });
+      refresh();
+    }
+
+    async function releaseDevice(){
+      if(!selectedDevice) return alert("Select a device first");
+      await fetch(`/api/release/${selectedDevice}`, {
+        method:"POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({reason:"manual"})
+      });
+      refresh();
+    }
+
+    setInterval(refresh, 2000);
+    refresh();
+</script>
+</body>
+</html>

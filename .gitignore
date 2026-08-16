@@ -1,0 +1,14 @@
+# build output
+target/
+out/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# demo runtime data
+iot_test/
+
+# OS
+.DS_Store
